@@ -1,5 +1,6 @@
 from playwright.async_api import async_playwright
 from urllib.parse import quote_plus
+from logger import logger
 import json
 
 
@@ -15,7 +16,7 @@ async def start_browser():
     if _page is not None:
         return _page
 
-    print("🌐 Запускаем браузер Wildberries...")
+    logger.info("Запускаем браузер Wildberries...")
 
     _playwright = await async_playwright().start()
 
@@ -34,7 +35,7 @@ async def start_browser():
 
     _page = await _context.new_page()
 
-    print("✅ Браузер запущен")
+    logger.info("Браузер запущен")
 
     return _page
 
@@ -55,8 +56,8 @@ async def close_browser():
         if _playwright:
             await _playwright.stop()
 
-    except Exception as e:
-        print(f"⚠️ Ошибка при закрытии браузера: {e}")
+    except Exception:
+        logger.exception(f"Ошибка при закрытии браузера")
 
     finally:
         _page = None
@@ -105,10 +106,10 @@ def parse_products(data):
 
             products.append(product)
 
-        except Exception as e:
-            print(
+        except Exception:
+            logger.exception(
                 f"⚠️ Ошибка обработки товара "
-                f"{item.get('id')}: {e}"
+                f"{item.get('id')}"
             )
 
     return products
@@ -122,7 +123,7 @@ async def get_products(query):
         f"?search={quote_plus(query)}"
     )
 
-    print(f"🌐 Открываем поиск: {query}")
+    logger.info(f"Открываем поиск: {query}")
 
     try:
         encoded_query = quote_plus(query)
@@ -138,7 +139,7 @@ async def get_products(query):
                 and f"query={encoded_query}" in url
             )
 
-        print("⏳ Ждём ответ API...")
+        logger.info("Ждём ответ API...")
 
         async with page.expect_response(
             is_search_response,
@@ -153,27 +154,27 @@ async def get_products(query):
 
         response = await response_info.value
 
-        print("🔥 API пойман!")
-        print(f"Статус: {response.status}")
-        print(f"URL: {response.url}")
+        logger.info("🔥 API пойман!"
+        f"Статус: {response.status}"
+        f"URL: {response.url}")
 
         body = await response.body()
 
         data = json.loads(body)
 
-        print(
-            f"✅ JSON получен: "
+        logger.info(
+            f"JSON получен: "
             f"{len(data.get('products', []))} товаров"
         )
 
         products = parse_products(data)
 
-        print(
+        logger.info(
             f"✅ Получено товаров: {len(products)}"
         )
 
         return products
 
-    except Exception as e:
-        print(f"❌ Не удалось получить API: {e}")
+    except Exception:
+        logger.exception(f"Не удалось получить API")
         return []

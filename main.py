@@ -16,11 +16,12 @@ from database.database import (
 )
 from analyzer.price_drop_checker import check_price_drop
 from settings import CHECK_INTERVAL
+from logger import logger
 
 
 create_database()
 
-print("Программа запустилась")
+logger.info("Программа запустилась")
 
 
 async def check_prices():
@@ -32,15 +33,15 @@ async def check_prices():
 
         for query in SEARCH_QUERIES:
 
-            print(f"\n🔍 Проверяем запрос: {query}")
+            logger.info(f"Проверяем запрос: {query}")
 
             products = await get_products(query)
 
             if not products:
-                print("⚠️ Нет данных")
+                logger.warning("⚠️ Нет данных")
                 continue
 
-            print(f"Найдено товаров: {len(products)}")
+            logger.info(f"Найдено товаров: {len(products)}")
 
             for product in products:
 
@@ -50,37 +51,36 @@ async def check_prices():
 
                     if check_price_drop(old_price, product["price"]):
 
-                        print("🔥🔥🔥 ОБНАРУЖЕНО ПАДЕНИЕ ЦЕНЫ!")
-                        print("Товар:", product["name"])
-                        print("Старая цена:", old_price)
-                        print("Новая цена:", product["price"])
-                        print("Chat ID:", chat_id)
+                        logger.info(f'ОБНАРУЖЕНО ПАДЕНИЕ ЦЕНЫ!')
+                        logger.info(f'Товар: {product["name"]}')
+                        logger.info(f'Старая цена: {old_price}')
+                        logger.info(f'Новая цена: {product["price"]}')
+                        logger.info(f'Chat ID: {chat_id} |')
 
                         already_sent = was_notification_sent(product["id"], product["price"])
 
-                        print("Уведомление уже отправлялось:", already_sent)
+                        logger.info(f"Уведомление уже отправлялось: {already_sent}")
 
                         if not already_sent:
                             try:
-                                print("📨 Отправляем Telegram-уведомление...")
+                                logger.info("Отправляем Telegram-уведомление...")
 
                                 await send_discount_notification(
                                         product,
                                         old_price,
                                         chat_id
                                 )
-                                print("✅ Telegram-уведомление отправлено!")
+                                logger.info("Telegram-уведомление отправлено!")
 
                                 save_notification(
                                     product["id"],
                                     product["price"]
                                 )
 
-                                print("✅ Уведомление сохранено в БД")
+                                logger.info("Уведомление сохранено в БД")
 
-                            except Exception as e:
-                                print("❌ ОШИБКА TELEGRAM:")
-                                print(type(e).__name__, e)
+                            except Exception:
+                                logger.exception("Ошибка Telegram")
 
                     save_price(product)
 
@@ -88,17 +88,32 @@ async def check_prices():
                         "-------------------------------------------------------------------------------"
                     )
 
-                    print("НАЙДЕНА СКИДКА!")
-                    print("Название:", product["name"])
-                    print("Бренд:", product["brand"])
-                    print("Цена:", product["price"], "руб.")
-                    print("Старая цена:", product["old_price"], "руб.")
-                    print("Скидка:", product["discount"], "%")
-                    print("Рейтинг:", product["rating"])
-                    print("Отзывы:", product["reviews"])
+                    logger.info("Найдена скидка")
+
+                    logger.info(
+                        f'Товар: {product["name"]}'
+                    )
+
+                    logger.info(
+                        f'Бренд: {product["brand"]}'
+                    )
+
+                    logger.info(
+                        f'Цена: {product["price"]} руб. '
+                        f'(было {product["old_price"]} руб.)'
+                    )
+
+                    logger.info(
+                        f'Скидка: {product["discount"]}%'
+                    )
+
+                    logger.info(
+                        f'Рейтинг: {product["rating"]} ' 
+                        f'Отзывы: {product["reviews"]}'
+                    )
 
                     if old_price:
-                        print("Прошлая цена:", old_price)
+                        logger.info(f"Прошлая цена: {old_price}")
 
             await asyncio.sleep(random.randint(1, 3))
 
@@ -106,32 +121,36 @@ async def check_prices():
 async def main():
     while True:
         try:
-            print("\n==============================")
-            print("🔍 НАЧАЛО ПРОВЕРКИ ЦЕН")
-            print("==============================")
+            logger.info("===== НАЧАЛО ПРОВЕРКИ ЦЕН =====")
 
             await check_prices()
 
-            print("\n==============================")
-            print("✅ ПРОВЕРКА ЗАВЕРШЕНА")
-            print(f"⏳ Следующая проверка через {CHECK_INTERVAL} секунд")
-            print("==============================")
+            logger.info("===== ПРОВЕРКА ЗАВЕРШЕНА =====")
+            logger.info(
+                f"Следующая проверка через {CHECK_INTERVAL} секунд"
+            )
+            logger.info("==============================")
 
             await asyncio.sleep(CHECK_INTERVAL)
 
-            print("\n🔄 ИНТЕРВАЛ ЗАКОНЧИЛСЯ — ЗАПУСКАЕМ НОВУЮ ПРОВЕРКУ")
+            logger.info(
+                "ИНТЕРВАЛ ЗАКОНЧИЛСЯ — ЗАПУСКАЕМ НОВУЮ ПРОВЕРКУ"
+            )
 
         except KeyboardInterrupt:
-            print("\n🛑 Программа остановлена")
+            logger.warning("Программа остановлена пользователем")
             break
 
-        except Exception as e:
-            print("\n❌ ОШИБКА В ГЛАВНОМ ЦИКЛЕ:")
-            print(type(e).__name__, e)
+        except Exception:
+            logger.exception(
+                "Ошибка в главном цикле программы"
+            )
 
-            print("⏳ Ждём перед повторной попыткой...")
+            logger.info(
+                "Ждём перед повторной попыткой..."
+            )
+
             await asyncio.sleep(CHECK_INTERVAL)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
